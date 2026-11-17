@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ScamGraph</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='9' r='4' fill='%23ef4444'/%3E%3Ccircle cx='24' cy='9' r='4' fill='%2394a3b8'/%3E%3Ccircle cx='16' cy='24' r='4' fill='%23ef4444'/%3E%3Cpath d='M8 9L24 9L16 24Z' fill='none' stroke='%23ef4444' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script src="lib/vis-network.min.js"></script>
+  <script src="lib/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" class="logo" aria-hidden="true">
+      <path d="M8 9L24 9L16 24Z" fill="none" stroke="currentColor" stroke-width="2"/>
+      <circle cx="8" cy="9" r="4" class="logo-hot"/><circle cx="24" cy="9" r="4"/><circle cx="16" cy="24" r="4" class="logo-hot"/>
+    </svg>
+    <div>
+      <div class="brand-name">ScamGraph</div>
+      <div class="brand-tag">Untangling mule-account networks with graph theory</div>
+    </div>
+  </div>
+  <div class="dataset" id="datasetLabel"></div>
+  <div class="actions">
+    <button class="btn ghost" id="btnDemo" title="Load a demo town with a hidden fraud ring">Demo town</button>
+    <button class="btn ghost" id="btnClean" title="Load the same town with no fraud">Clean town</button>
+    <label class="btn ghost" title="Upload your own CSV">
+      Upload CSV<input type="file" id="fileInput" accept=".csv,text/csv" hidden>
+    </label>
+    <a class="btn ghost" href="/api/sample.csv" title="Download the demo data as a CSV file">Sample CSV</a>
+    <button class="btn ghost" id="btnTheme" title="Switch light / dark (use light on a washed-out projector)">Light mode</button>
+  </div>
+</header>
+
+<!-- ================= Landing ================= -->
+<main id="landing" class="landing">
+  <section class="hero">
+    <p class="eyebrow">Digital arrest · UPI fraud · Mule accounts</p>
+    <h1>Scammers hide stolen money in a <span class="hot">web of accounts</span>.<br>ScamGraph untangles the web.</h1>
+    <p class="lede">Money from a scam is moved through chains of borrowed "mule" bank accounts within hours.
+      Looking at one account, nothing seems wrong. Looking at all accounts together as a network, the pattern becomes obvious.</p>
+    <div class="hero-actions">
+      <button class="btn primary big" id="btnDemoHero">Load demo town</button>
+      <label class="btn big outline">Upload transactions CSV<input type="file" id="fileInputHero" accept=".csv,text/csv" hidden></label>
+    </div>
+    <p class="fineprint">CSV columns: <code>from_account, to_account, amount, timestamp</code> (names optional). All demo data is simulated and fictional.</p>
+  </section>
+  <section class="how">
+    <div class="how-step"><span class="num">1</span><h3>Build the network</h3><p>Every account becomes a node, every payment an arrow.</p></div>
+    <div class="how-step"><span class="num">2</span><h3>Run 7 detectors</h3><p>FIFO money ageing, chains, loops, centrality, smurfing, bursts, risk propagation.</p></div>
+    <div class="how-step"><span class="num">3</span><h3>Expose the ring</h3><p>Union-Find groups the suspects; max-flow shows which account to freeze.</p></div>
+  </section>
+</main>
+
+<!-- ================= Raw data ================= -->
+<main id="rawView" class="raw hidden">
+  <div class="raw-head">
+    <div>
+      <p class="eyebrow" id="rawEyebrow">Raw bank data</p>
+      <h2 id="rawTitle">0 transactions</h2>
+      <p class="lede small">Somewhere in here a fraud ring is hiding. Scroll through it. Can you spot the scam?</p>
+    </div>
+    <button class="btn primary big" id="btnAnalyse">Analyse with ScamGraph →</button>
+  </div>
+  <div class="table-wrap">
+    <table class="txn-table" id="rawTable">
+      <thead><tr><th>Txn</th><th>Time</th><th>From</th><th>To</th><th class="num">Amount</th><th>Channel</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- ================= Analysis ================= -->
+<main id="appView" class="app hidden">
+  <section class="kpis" id="kpis"></section>
+  <section class="workspace">
+    <div class="graph-area">
+      <div class="graph-toolbar">
+        <div class="seg" role="tablist">
+          <button class="seg-btn active" data-mode="all">Whole town</button>
+          <button class="seg-btn" data-mode="ring">Fraud ring</button>
+        </div>
+        <button class="btn small ghost" id="btnFit">Fit view</button>
+        <div class="legend">
+          <span><i class="dot suspect"></i>Suspect</span>
+          <span><i class="dot watch"></i>Watchlist</span>
+          <span><i class="dot victim"></i>Victim</span>
+          <span><i class="dot normal"></i>Normal</span>
+          <span><i class="shape tri"></i>Collector</span>
+          <span><i class="shape dia"></i>Cash-out</span>
+        </div>
+      </div>
+      <div id="network" class="network"></div>
+      <div id="overlay" class="overlay hidden">
+        <div class="overlay-box">
+          <div class="spinner"></div>
+          <div id="overlayTitle" class="overlay-title">Building network…</div>
+          <ul id="overlaySteps" class="overlay-steps"></ul>
+        </div>
+      </div>
+      <div id="caption" class="caption hidden"></div>
+    </div>
+
+    <aside class="panel">
+      <div class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="account">Account</button>
+        <button class="tab" data-tab="method">How it works</button>
+      </div>
+      <div class="tab-body" id="tab-overview"></div>
+      <div class="tab-body hidden" id="tab-account"><p class="muted pad">Click any account on the graph to investigate it.</p></div>
+      <div class="tab-body hidden" id="tab-method"></div>
+    </aside>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
